@@ -29,7 +29,7 @@ def start(message):
     name = first_name + ' ' + last_name
 
     # подключение к бд
-    conn = sqlite3.connect('BotBD.sqlite')
+    conn = sqlite3.connect(f'{text.DB_NAME}')
     cur = conn.cursor()
 
     # создание таблицы Пользователей
@@ -46,7 +46,7 @@ def start(message):
     conn.commit()
 
     # внесение нового пользователя
-    cur.execute("INSERT INTO Users(name,user) VALUES ('%s','%s')" % (name,message.from_user.username))
+    cur.execute("INSERT INTO Users(user_id, name) VALUES ('%s','%s')" % (message.from_user.username,name))
     conn.commit()
 
     # закрытие подключения к бд
@@ -108,7 +108,7 @@ def info(message):
             Markup.row(sbtn1,sbtn2)
 
             # подключение к бд
-            conn = sqlite3.connect('BotBD.sql')
+            conn = sqlite3.connect(f'{text.DB_NAME}')
             cur = conn.cursor()
 
             # получение данных пользователя
@@ -125,7 +125,7 @@ def info(message):
         #временная комманда для тестирования
         case 'тест бд':
             # подключение к бд
-            conn = sqlite3.connect('BotBD.sqlite')
+            conn = sqlite3.connect(f'{text.DB_NAME}')
             cur = conn.cursor()
 
             # комманда для теста
