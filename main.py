@@ -8,6 +8,7 @@ BOT = telebot.TeleBot(f'{text.BOT_TOKEN}')
 
 # Глобальные переменные
 selected_tag = None
+selected_question = None
 
 #обработка комманд --------------------------------------------------------------
 @BOT.message_handler(commands = ['start'])
@@ -19,9 +20,11 @@ def start(message):
     btn3 = types.KeyboardButton(f'{text.question_all}')
     btn4 = types.KeyboardButton(f'{text.question_my}')
     btn5 = types.KeyboardButton(f'{text.author_card}')
+    btn6 = types.KeyboardButton(f'{text.author_list}')
     Markup.row(btn1)
     Markup.row(btn2,btn3)
-    Markup.row(btn4,btn5)
+    Markup.row(btn4)
+    Markup.row(btn5,btn6)
 
     # обработка данных пользователя для регистрации
     first_name = ''
@@ -72,9 +75,11 @@ def info(message):
             btn3 = types.KeyboardButton(f'{text.question_all}')
             btn4 = types.KeyboardButton(f'{text.question_my}')
             btn5 = types.KeyboardButton(f'{text.author_card}')
+            btn6 = types.KeyboardButton(f'{text.author_list}')
             Markup.row(btn1)
             Markup.row(btn2,btn3)
-            Markup.row(btn4,btn5)
+            Markup.row(btn4)
+            Markup.row(btn5,btn6)
 
             BOT.send_message(message.chat.id,f'{text.hello}, {message.from_user.first_name}', reply_markup=Markup)
         case 'запрос на знание':
@@ -168,13 +173,7 @@ def info(message):
                     BOT.send_message(message.chat.id,item[3], reply_markup=MarkupActive)
                 else:
                     BOT.send_message(message.chat.id,item[3], reply_markup=Markup)
-        case 'карточка автора':
-            # кнопки сообщения
-            Markup = types.InlineKeyboardMarkup()
-            sbtn1 = types.InlineKeyboardButton(f'{text.contact_add}',callback_data='contact_add')
-            sbtn2 = types.InlineKeyboardButton(f'{text.contact_del}',callback_data='contact_del')
-            Markup.row(sbtn1,sbtn2)
-
+        case 'моя карточка автора':
             # подключение к бд
             conn = sqlite3.connect(f'{text.DB_NAME}')
             cur = conn.cursor()
@@ -187,17 +186,39 @@ def info(message):
             cur.execute("SELECT * FROM Questions WHERE user_id = '%s'" %  (message.from_user.username))
             questions_count = len(cur.fetchall())
 
+            # получение количества ответов пользователя
+            cur.execute("SELECT * FROM Answers WHERE user_id = '%s'" %  (message.from_user.username))
+            answers_count = len(cur.fetchall())
+
             # закрытие подключения к бд
             cur.close()
             conn.close()
 
             BOT.send_message(message.chat.id,f'<b>{text.autor_data}</b>',parse_mode='html')
-            BOT.send_message(message.chat.id,f'<b>Имя:</b> {user_data[1]}\n<b>Кол-во запросов:</b> {questions_count}\n<b>Кол-во ответов:</b> сделать',parse_mode='html', reply_markup=Markup)
+            BOT.send_message(message.chat.id,f'<b>Имя:</b> {user_data[1]}\n<b>Кол-во запросов:</b> {questions_count}\n<b>Кол-во ответов:</b> {answers_count}',parse_mode='html')
+        case 'список авторов':
+            # подключение к бд
+            conn = sqlite3.connect(f'{text.DB_NAME}')
+            cur = conn.cursor()
             
-        #временная комманда для тестирования
-        case 'тест':
-            BOT.send_message(message.chat.id,f'{selected_tag}')
-            
+            # получение данных пользователя
+            cur.execute("SELECT * FROM Users")
+            users_data = cur.fetchall()
+
+            for item in users_data:
+                # получение количества запросов пользователя
+                cur.execute("SELECT * FROM Questions WHERE user_id = '%s'" %  (item[0]))
+                questions_count = len(cur.fetchall())
+
+                # получение количества ответов пользователя
+                cur.execute("SELECT * FROM Answers WHERE user_id = '%s'" %  (item[0]))
+                answers_count = len(cur.fetchall())
+
+                BOT.send_message(message.chat.id,f'<b>Автор:</b> {item[1]}\n<b>Кол-во запросов:</b> {questions_count}\n<b>Кол-во ответов:</b> {answers_count}',parse_mode='html')
+
+            # закрытие подключения к бд
+            cur.close()
+            conn.close()
         case _:
             BOT.send_message(message.chat.id,f'{text.command_error}')
     
@@ -205,12 +226,47 @@ def info(message):
 # обработка кнопок сообщения --------------------------------------------------------------
 @BOT.callback_query_handler(func=lambda callback: True)
 def callback_message(callback):
+    global selected_tag
+    global selected_question
     match callback.data:
         case 'answer_add':
-            BOT.send_message(callback.message.chat.id,'Типа написал ответ')
+            # подключение к бд
+            conn = sqlite3.connect(f'{text.DB_NAME}')
+            cur = conn.cursor()
+
+
+            # получение данных вопроса
+            cur.execute("SELECT * FROM Questions WHERE data = '%s'" %  (callback.message.text))
+            selected_question = cur.fetchall()[0]
+
+
+            # закрытие подключения к бд
+            cur.close()
+            conn.close()
+
+            BOT.send_message(callback.message.chat.id,f'<b>{text.answer_insert}</b>',parse_mode='html')
+            BOT.register_next_step_handler(callback.message,new_answer)
         case 'answers_list':
-            BOT.send_message(callback.message.chat.id,f'{text.answers_list}:')
-            BOT.send_message(callback.message.chat.id,'Типа ответы')
+            try:
+                # подключение к бд
+                conn = sqlite3.connect(f'{text.DB_NAME}')
+                cur = conn.cursor()
+            
+                cur.execute("SELECT * FROM Questions WHERE data = '%s'" %  (callback.message.text))
+                selected_question = cur.fetchall()[0]
+
+                # получение данных пользователя
+                cur.execute("SELECT * FROM Answers WHERE question_id = '%s'" % (selected_question[0]))
+                answer_data = cur.fetchall()
+            
+                # закрытие подключения к бд
+                cur.close()
+                conn.close()
+
+                for item in answer_data:
+                    BOT.send_message(callback.message.chat.id,item[3])
+            except ValueError:
+                BOT.send_message(callback.message.chat.id,f'{text.error}')
         case 'tag_new':
             BOT.send_message(callback.message.chat.id,f'<b>{text.tag_name}</b>',parse_mode='html')
             BOT.register_next_step_handler(callback.message,tag_new)
@@ -232,7 +288,7 @@ def callback_message(callback):
             cur.close()
             conn.close()
 
-            BOT.send_message(callback.message.chat.id,f'<b>{text.tag_list}</b>',parse_mode='html')
+            BOT.send_message(callback.message.chat.id,f'<b>{text.tag_list}:</b>',parse_mode='html')
             for item in tags_data:
                 BOT.send_message(callback.message.chat.id,item[1], reply_markup=Markup)
         case 'tag_select':
@@ -242,7 +298,6 @@ def callback_message(callback):
         
             # получение данных тега
             cur.execute("SELECT * FROM Tags WHERE name = '%s'" %  (callback.message.text))
-            global selected_tag
             selected_tag = cur.fetchall()[0]
 
             # закрытие подключения к бд
@@ -252,13 +307,30 @@ def callback_message(callback):
             BOT.send_message(callback.message.chat.id,f'<b>{text.question_insert}</b>',parse_mode='html')
             BOT.register_next_step_handler(callback.message,question_new)
         case 'question_close':
-            BOT.send_message(callback.message.chat.id,'Вопрос закрыт (нет)')
+            # подключение к бд
+            conn = sqlite3.connect(f'{text.DB_NAME}')
+            cur = conn.cursor()
+
+            # получение данных запроса
+            cur.execute("SELECT * FROM Questions WHERE data = '%s'" %  (callback.message.text))
+            selected_question = cur.fetchall()[0]
+
+            # обновление запроса до неактивного
+            cur.execute("UPDATE Questions SET active = 0 WHERE id = ('%s')" %(selected_question[0]))
+            conn.commit()
+
+            # закрытие подключения к бд
+            cur.close()
+            conn.close()
+
+            BOT.send_message(callback.message.chat.id,f'<b>{text.question_close}</b>',parse_mode='html')
         case _:
             BOT.send_message(callback.message.chat.id,'Комманда не работает')
 
 # Функции кнопок интерфейса -------------------------------------------------------------- !!! работают из любого места где есть кнопка :(
 # создание нового тега
 def tag_new(message):
+    global selected_tag
     try:
         if(message.content_type == 'text'):
             # подключение к бд
@@ -271,7 +343,6 @@ def tag_new(message):
         
             # получение данных тега
             cur.execute("SELECT * FROM Tags WHERE name = '%s'" %  (message.text))
-            global selected_tag
             selected_tag = cur.fetchall()[0]
 
             # закрытие подключения к бд
@@ -293,7 +364,7 @@ def question_new(message):
         conn = sqlite3.connect(f'{text.DB_NAME}')
         cur = conn.cursor()
 
-        # комманда для теста
+        # сохраниение запроса в бд
         cur.execute("INSERT OR IGNORE INTO Questions(user_id, tag_id, data) VALUES ('%s','%s','%s')" % (message.from_user.username,selected_tag[0],message.text))
         conn.commit()
 
@@ -301,8 +372,24 @@ def question_new(message):
         cur.close()
         conn.close()
 
-        # обнуление выбранного тега
-        selected_tag_id = ''
+        BOT.send_message(message.chat.id,f'{text.done}')
+    except ValueError:
+        BOT.send_message(message.chat.id,f'{text.error}')
+
+# создание нового ответа
+def new_answer(message):
+    try:
+        # подключение к бд
+        conn = sqlite3.connect(f'{text.DB_NAME}')
+        cur = conn.cursor()
+
+        # сохраниение ответа в бд
+        cur.execute("INSERT OR IGNORE INTO Answers(user_id,question_id, data) VALUES ('%s','%s','%s')" % (message.from_user.username,selected_question[0],message.text))
+        conn.commit()
+      
+        # закрытие подключения к бд
+        cur.close()
+        conn.close()
 
         BOT.send_message(message.chat.id,f'{text.done}')
     except ValueError:
