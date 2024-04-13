@@ -214,7 +214,7 @@ def info(message):
                 cur.execute("SELECT * FROM Answers WHERE user_id = '%s'" %  (item[0]))
                 answers_count = len(cur.fetchall())
 
-                BOT.send_message(message.chat.id,f'<b>Автор:</b> {item[1]}\n<b>Кол-во запросов:</b> {questions_count}\n<b>Кол-во ответов:</b> {answers_count}',parse_mode='html')
+                BOT.send_message(message.chat.id,f'<b>Автор:</b> {item[1]}\n<b>Кол-во запросов:</b> {questions_count}\n<b>Кол-во ответов:</b> {answers_count}\n<b>Telegramm:</b> {item[0]}',parse_mode='html')
 
             # закрытие подключения к бд
             cur.close()
