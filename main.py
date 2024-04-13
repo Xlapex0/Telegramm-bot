@@ -263,8 +263,12 @@ def callback_message(callback):
                 cur.close()
                 conn.close()
 
-                for item in answer_data:
-                    BOT.send_message(callback.message.chat.id,item[3])
+                BOT.send_message(callback.message.chat.id,f'<b>{text.answer_list} ({callback.message.text}):</b>',parse_mode='html')
+                if(len(answer_data) == 0):
+                    BOT.send_message(callback.message.chat.id,f'{text.no_elements}')
+                else:
+                    for item in answer_data:
+                        BOT.send_message(callback.message.chat.id,item[3])
             except ValueError:
                 BOT.send_message(callback.message.chat.id,f'{text.error}')
         case 'tag_new':
@@ -275,6 +279,10 @@ def callback_message(callback):
             Markup = types.InlineKeyboardMarkup()
             sbtn1 = types.InlineKeyboardButton(f'{text.tag_select}',callback_data='tag_select')
             Markup.row(sbtn1)
+
+            MarkupNo = types.InlineKeyboardMarkup()
+            sbtnno1 = types.InlineKeyboardButton(f'{text.tag_new}',callback_data='tag_new')
+            MarkupNo.row(sbtnno1)
 
             # подключение к бд
             conn = sqlite3.connect(f'{text.DB_NAME}')
@@ -289,8 +297,11 @@ def callback_message(callback):
             conn.close()
 
             BOT.send_message(callback.message.chat.id,f'<b>{text.tag_list}:</b>',parse_mode='html')
-            for item in tags_data:
-                BOT.send_message(callback.message.chat.id,item[1], reply_markup=Markup)
+            if(len(tags_data) == 0):
+                BOT.send_message(callback.message.chat.id,f'{text.no_elements}',reply_markup=MarkupNo)
+            else:
+                for item in tags_data:
+                    BOT.send_message(callback.message.chat.id,item[1])
         case 'tag_select':
             # подключение к бд
             conn = sqlite3.connect(f'{text.DB_NAME}')
